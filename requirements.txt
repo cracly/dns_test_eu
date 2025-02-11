@@ -1,4 +1,4 @@
-pythondns
+dnspython
 matplotlib
 numpy
 scipy
