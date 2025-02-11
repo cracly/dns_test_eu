@@ -159,6 +159,14 @@ def main(verbose):
         print(f"  Overall minimum resolution time: {overall_min:.2f} ms")
         print(f"  Overall maximum resolution time: {overall_max:.2f} ms")
 
+    # Determine the winner
+    best = min(overall_stats, key=lambda x: (x[2], x[0]))  # Minimize max time, then avg time
+    best_index = overall_stats.index(best)
+    best_name = dns_providers[best_index][0]
+
+    print(
+        f"\nThe best resolver is {best_name} with an average resolution time of {best[0]:.2f} ms and a maximum resolution time of {best[2]:.2f} ms.")
+
     plot_results(dns_providers, overall_stats, domain_stats, verbose)
 
 
