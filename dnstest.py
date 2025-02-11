@@ -6,20 +6,20 @@ import numpy as np
 import scipy.stats as stats
 from tqdm import tqdm
 
-# List of DNS providers to test
+# List of DNS providers to test with their names
 dns_providers = [
-    '8.8.8.8',  # Google
-    '1.1.1.1',  # Cloudflare
-    '1.1.1.2',  # Cloudflare family
-    '9.9.9.9',  # quad9
-    '149.112.112.112',  # quad9 2
-    '9.9.9.11',  # quad9 ecs
-    '193.110.81.0',     # dns0.eu 1
-    '185.253.5.0',      # dns0.eu 2
-    '185.222.222.222',   # dns.sb 1
-    '45.11.45.11',   # dns.sb 2
-    '91.239.100.100',   # uncensoreddns.org anycast
-    '89.233.43.71',  # uncensoreddns.org unicast
+    ('Google', '8.8.8.8'),
+    ('Cloudflare', '1.1.1.1'),
+    ('Cloudflare Family', '1.1.1.2'),
+    ('Quad9 1', '9.9.9.9'),
+    ('Quad9 2', '149.112.112.112'),
+    ('Quad9 ECS', '9.9.9.11'),
+    ('dns0.eu 1', '193.110.81.0'),
+    ('dns0.eu 2', '185.253.5.0'),
+    ('dns.sb 1', '185.222.222.222'),
+    ('dns.sb 2', '45.11.45.11'),
+    #('UncensoredDNS Anycast', '91.239.100.100'),
+    #('UncensoredDNS Unicast', '89.233.43.71'),
 ]
 
 # List of domains to test
@@ -43,25 +43,24 @@ domains = [
     'europa.eu',
 ]
 
-
 # Number of measurements to take
 num_measurements = 50
 
 
 # Function to test DNS resolution time
-def test_dns(dns_server, domain, num_measurements):
+def test_dns(dns_name, dns_server, domain, num_measurements):
     resolver = dns.resolver.Resolver()
     resolver.nameservers = [dns_server]
     times = []
 
-    for _ in tqdm(range(num_measurements), desc=f"Testing {domain} with {dns_server}", leave=False):
+    for _ in tqdm(range(num_measurements), desc=f"Testing {domain} with {dns_name}", leave=False):
         start_time = time.time()
         try:
             answer = resolver.resolve(domain)
             end_time = time.time()
             times.append((end_time - start_time) * 1000)  # Convert to milliseconds
         except Exception as e:
-            print(f"Error resolving domain with {dns_server}: {e}")
+            print(f"Error resolving domain with {dns_name}: {e}")
             return None, None, None
 
     avg_time = sum(times) / num_measurements
@@ -76,17 +75,17 @@ def test_dns(dns_server, domain, num_measurements):
 
 
 # Function to test multiple domains
-def test_domains(dns_server, domains, num_measurements, verbose):
+def test_domains(dns_name, dns_server, domains, num_measurements, verbose):
     overall_times = []
     domain_stats = []
 
-    for domain in tqdm(domains, desc=f"Testing domains with {dns_server}", leave=False):
-        avg_time, min_time, max_time, confidence_interval = test_dns(dns_server, domain, num_measurements)
+    for domain in tqdm(domains, desc=f"Testing domains with {dns_name}", leave=False):
+        avg_time, min_time, max_time, confidence_interval = test_dns(dns_name, dns_server, domain, num_measurements)
         if avg_time is not None:
             overall_times.append(avg_time)
             domain_stats.append((domain, avg_time, min_time, max_time, confidence_interval))
             if verbose:
-                print(f"DNS Server {dns_server} for domain {domain}:")
+                print(f"DNS Server {dns_name} for domain {domain}:")
                 print(f"  avg: {avg_time:.2f} ms, min: {min_time:.2f} ms, max: {max_time:.2f} ms")
 
     overall_avg = sum(overall_times) / len(overall_times)
@@ -102,7 +101,7 @@ def test_domains(dns_server, domains, num_measurements, verbose):
 # Function to plot results
 def plot_results(dns_providers, overall_stats, domain_stats, verbose):
     # Plot overall stats
-    dns_labels = [f"DNS {provider}" for provider in dns_providers]
+    dns_labels = [f"DNS {name}" for name, _ in dns_providers]
     avg_times = [stats[0] for stats in overall_stats]
     min_times = [stats[1] for stats in overall_stats]
     max_times = [stats[2] for stats in overall_stats]
@@ -118,11 +117,13 @@ def plot_results(dns_providers, overall_stats, domain_stats, verbose):
     plt.xlabel('DNS Providers')
     plt.ylabel('Average Resolution Time (ms)')
     plt.title('Overall Average DNS Resolution Times with 95% Confidence Interval')
+    plt.xticks(rotation=45, ha='right')
+    plt.tight_layout()
     plt.show()
 
     if verbose:
         # Plot detailed stats for each domain
-        for i, provider in enumerate(dns_providers):
+        for i, (name, _) in enumerate(dns_providers):
             domain_labels = [stats[0] for stats in domain_stats[i]]
             avg_times = [stats[1] for stats in domain_stats[i]]
             confidence_intervals = [stats[4] for stats in domain_stats[i]]
@@ -135,7 +136,7 @@ def plot_results(dns_providers, overall_stats, domain_stats, verbose):
                 plt.plot([j, j], [low, high], color='red')
             plt.xlabel('Domains')
             plt.ylabel('Average Resolution Time (ms)')
-            plt.title(f'Average DNS Resolution Times for {provider} with 95% Confidence Interval')
+            plt.title(f'Average DNS Resolution Times for {name} with 95% Confidence Interval')
             plt.xticks(rotation=45, ha='right')
             plt.tight_layout()
             plt.show()
@@ -146,11 +147,14 @@ def main(verbose):
     overall_stats = []
     domain_stats = []
 
-    for dns_server in dns_providers:
-        overall_avg, overall_min, overall_max, overall_confidence_interval, stats = test_domains(dns_server, domains, num_measurements, verbose)
+    for dns_name, dns_server in tqdm(dns_providers, desc="Testing DNS Providers", leave=True):
+        overall_avg, overall_min, overall_max, overall_confidence_interval, stats = test_domains(dns_name, dns_server,
+                                                                                                 domains,
+                                                                                                 num_measurements,
+                                                                                                 verbose)
         overall_stats.append((overall_avg, overall_min, overall_max, overall_confidence_interval))
         domain_stats.append(stats)
-        print(f"Overall stats for DNS Server {dns_server}:")
+        print(f"Overall stats for DNS Server {dns_name}:")
         print(f"  Overall average resolution time: {overall_avg:.2f} ms")
         print(f"  Overall minimum resolution time: {overall_min:.2f} ms")
         print(f"  Overall maximum resolution time: {overall_max:.2f} ms")
